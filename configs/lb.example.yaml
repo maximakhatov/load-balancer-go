@@ -1,0 +1,47 @@
+# Example load balancer configuration (YAML).
+
+server:
+  # Address for the load balancer to listen on (host:port or :port).
+  listen: ":8080"
+  # Maximum duration for reading the entire request (including body).
+  read_timeout: 30s
+  # Maximum duration before timing out writes to the client.
+  write_timeout: 30s
+  # Keep-alive: max idle time on the client connection.
+  idle_timeout: 120s
+  # Graceful shutdown: max wait for in-flight requests.
+  shutdown_timeout: 15s
+
+balancer:
+  # round_robin | random
+  algorithm: round_robin
+
+upstreams:
+  - # URL of the upstream server (required).
+    url: http://127.0.0.1:9001
+    # Weight of the upstream server (1-100, default 1).
+    weight: 1
+  - url: http://127.0.0.1:9002
+    weight: 1
+  - url: http://127.0.0.1:9003
+    weight: 2
+
+health:
+  # When true, backends that fail checks are temporarily removed from rotation.
+  enabled: true
+  # The path to check the health of each backend.
+  path: /health
+  # How often to check the health of each backend.
+  interval: 5s
+  # How long to wait for a health check response.
+  timeout: 2s
+  # Consecutive successes before marking healthy (after being unhealthy).
+  healthy_threshold: 1
+  # Consecutive failures before marking unhealthy.
+  unhealthy_threshold: 3
+  # The expected status code for a healthy backend.
+  expected_status: 200
+
+logging:
+  # debug | info | warn | error
+  level: info

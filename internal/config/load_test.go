@@ -35,19 +35,19 @@ func TestLoadExample(t *testing.T) {
 	if len(cfg.Upstreams) != 3 {
 		t.Fatalf("upstreams: want 3, got %d", len(cfg.Upstreams))
 	}
-	if cfg.Upstreams[0].URL.String() != "http://127.0.0.1:9001" {
+	if cfg.Upstreams[0].URL.String() != "https://echo.free.beeceptor.com" {
 		t.Fatalf("upstreams[0].url: got %q", cfg.Upstreams[0].URL.String())
 	}
 	if cfg.Upstreams[0].Weight != 1 {
 		t.Fatalf("upstreams[0].weight: got %d", cfg.Upstreams[0].Weight)
 	}
-	if cfg.Upstreams[1].URL.String() != "http://127.0.0.1:9002" {
+	if cfg.Upstreams[1].URL.String() != "http://127.0.0.1:9001" {
 		t.Fatalf("upstreams[1].url: got %q", cfg.Upstreams[1].URL.String())
 	}
 	if cfg.Upstreams[1].Weight != 1 {
 		t.Fatalf("upstreams[1].weight: got %d", cfg.Upstreams[1].Weight)
 	}
-	if cfg.Upstreams[2].URL.String() != "http://127.0.0.1:9003" {
+	if cfg.Upstreams[2].URL.String() != "http://127.0.0.1:9002" {
 		t.Fatalf("upstreams[2].url: got %q", cfg.Upstreams[2].URL.String())
 	}
 	if cfg.Upstreams[2].Weight != 2 {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"load-balancer/internal/config"
+	"load-balancer/internal/lb"
 	"log"
 	"net/http"
 	"os"
@@ -22,18 +23,14 @@ func main() {
 	}
 	log.Printf("loaded config from %s (listen %s)", *configPath, cfg.Server.Listen)
 
-	mux := http.NewServeMux()
-	// TODO support of rewrite rules
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// TODO call lb logic instead
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("load balancer\n"))
-	})
+	handler, err := lb.NewProxyHandler(cfg)
+	if err != nil {
+		log.Fatalf("failed to create balancer: %v", err)
+	}
 
 	srv := &http.Server{
 		Addr:         cfg.Server.Listen,
-		Handler:      mux,
+		Handler:      handler,
 		ReadTimeout:  cfg.Server.ReadTimeout,
 		WriteTimeout: cfg.Server.WriteTimeout,
 		IdleTimeout:  cfg.Server.IdleTimeout,

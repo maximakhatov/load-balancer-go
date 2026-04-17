@@ -18,12 +18,12 @@ balancer:
 
 upstreams:
   - # URL of the upstream server (required).
-    url: http://127.0.0.1:9001
+    url: https://echo.free.beeceptor.com # echo server, useful for testing
     # Weight of the upstream server (1-100, default 1).
     weight: 1
-  - url: http://127.0.0.1:9002
+  - url: http://127.0.0.1:9001
     weight: 1
-  - url: http://127.0.0.1:9003
+  - url: http://127.0.0.1:9002
     weight: 2
 
 health:

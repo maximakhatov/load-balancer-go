@@ -8,25 +8,46 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"sync"
 	"sync/atomic"
+	"time"
 )
 
 type ProxyHandler struct {
 	algorithm config.BalancerAlgorithm
-	targets   []weightedTarget
-	counter   uint64
+	backends  []*backend
+	// State for weighted RR
+	weightSlots []int // map i -> backendId
+	totalWeight int
+	counter     uint64
 }
 
-type weightedTarget struct {
-	url   *url.URL
-	proxy *httputil.ReverseProxy
+type backend struct {
+	// Static backend params
+	url    *url.URL
+	weight int
+	proxy  *httputil.ReverseProxy
+	// Current state
+	mu                sync.RWMutex
+	healthy           bool
+	ConsecutiveOK     int
+	ConsecutiveFailed int
+	LastCheckAt       time.Time
+	LastError         string
 }
 
 // TODO rereadable config
 func NewProxyHandler(cfg config.Config) (*ProxyHandler, error) {
-	targets := make([]weightedTarget, 0)
+	backends := make([]*backend, 0)
+	weightSlots := make([]int, 0)
+	totalWeight := 0
 
-	for _, upstream := range cfg.Upstreams {
+	for idx, upstream := range cfg.Upstreams {
+		// Config loader ensures weight >= 1. Keep this check as a defensive guard
+		if upstream.Weight < 1 {
+			return nil, errors.New("invalid upstream weight: must be >= 1")
+		}
+
 		upstreamURL := upstream.URL
 		proxy := &httputil.ReverseProxy{
 			Rewrite: func(pr *httputil.ProxyRequest) {
@@ -39,21 +60,27 @@ func NewProxyHandler(cfg config.Config) (*ProxyHandler, error) {
 			http.Error(w, "bad gateway", http.StatusBadGateway)
 		}
 
+		backends = append(backends, &backend{
+			url:    upstreamURL,
+			weight: upstream.Weight,
+			proxy:  proxy,
+		})
 		for i := 0; i < upstream.Weight; i++ {
-			targets = append(targets, weightedTarget{
-				url:   upstreamURL,
-				proxy: proxy,
-			})
+			weightSlots = append(weightSlots, idx)
 		}
+		totalWeight += upstream.Weight
 	}
 
-	if len(targets) == 0 {
-		return nil, errors.New("no active upstream targets after weight processing")
+	if len(backends) == 0 || totalWeight == 0 {
+		return nil, errors.New("no active upstream targets")
 	}
 
 	return &ProxyHandler{
-		algorithm: cfg.Balancer.Algorithm,
-		targets:   targets,
+		algorithm:   cfg.Balancer.Algorithm,
+		backends:    backends,
+		weightSlots: weightSlots,
+		totalWeight: totalWeight,
+		counter:     0,
 	}, nil
 }
 
@@ -64,22 +91,20 @@ func (h *ProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	target.proxy.ServeHTTP(w, r)
 }
 
-func (h *ProxyHandler) pickTarget() weightedTarget {
+func (h *ProxyHandler) pickTarget() *backend {
 	switch h.algorithm {
 	case config.AlgorithmRandom:
-		return h.targets[rand.IntN(len(h.targets))]
+		pick := rand.IntN(h.totalWeight)
+		return h.pickByWeightIndex(pick)
 	case config.AlgorithmRoundRobin:
 		fallthrough
 	default:
 		next := atomic.AddUint64(&h.counter, 1) - 1
-		return h.targets[next%uint64(len(h.targets))]
+		pick := int(next % uint64(h.totalWeight))
+		return h.pickByWeightIndex(pick)
 	}
 }
 
-func (h *ProxyHandler) TargetHosts() []string {
-	hosts := make([]string, 0, len(h.targets))
-	for _, target := range h.targets {
-		hosts = append(hosts, target.url.Host)
-	}
-	return hosts
+func (h *ProxyHandler) pickByWeightIndex(pick int) *backend {
+	return h.backends[h.weightSlots[pick]]
 }

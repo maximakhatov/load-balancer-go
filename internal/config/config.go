@@ -75,7 +75,7 @@ type fileBalancer struct {
 
 type fileUpstream struct {
 	URL    string `yaml:"url"`
-	Weight int    `yaml:"weight"`
+	Weight *int   `yaml:"weight"`
 }
 
 type fileHealth struct {
@@ -136,12 +136,12 @@ func parseFileConfig(f fileConfig) (Config, error) {
 		if parsed.Scheme == "" || parsed.Host == "" {
 			return Config{}, fmt.Errorf("upstreams[%d].url: must include scheme and host (e.g. http://127.0.0.1:9001)", i)
 		}
-		w := u.Weight
-		if w == 0 {
-			w = 1
+		w := 1
+		if u.Weight != nil {
+			w = *u.Weight
 		}
-		if w < 0 {
-			return Config{}, fmt.Errorf("upstreams[%d].weight: must be >= 0", i)
+		if w < 1 {
+			return Config{}, fmt.Errorf("upstreams[%d].weight: must be >= 1", i)
 		}
 		upstreams = append(upstreams, UpstreamConfig{URL: parsed, Weight: w})
 	}

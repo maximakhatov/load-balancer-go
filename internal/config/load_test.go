@@ -53,9 +53,6 @@ func TestLoadExample(t *testing.T) {
 	if cfg.Upstreams[2].Weight != 2 {
 		t.Fatalf("upstreams[2].weight: got %d", cfg.Upstreams[2].Weight)
 	}
-	if cfg.Upstreams[2].Weight != 2 {
-		t.Fatalf("upstreams[2].weight: got %d", cfg.Upstreams[2].Weight)
-	}
 	if !cfg.Health.Enabled {
 		t.Fatal("health should be enabled in example")
 	}
@@ -108,6 +105,45 @@ upstreams:
 	}
 	if len(cfg.Upstreams) != 1 {
 		t.Fatalf("upstreams: %d", len(cfg.Upstreams))
+	}
+	if cfg.Upstreams[0].Weight != 1 {
+		t.Fatalf("upstreams[0].weight: got %d, want 1", cfg.Upstreams[0].Weight)
+	}
+}
+
+func TestLoadRejectsExplicitZeroWeight(t *testing.T) {
+	const yamlDoc = `
+upstreams:
+  - url: http://localhost:9001
+    weight: 0
+`
+	dir := t.TempDir()
+	p := filepath.Join(dir, "lb.yaml")
+	if err := writeFile(p, yamlDoc); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load(p)
+	if err == nil {
+		t.Fatal("expected error for explicit weight=0")
+	}
+}
+
+func TestLoadRejectsNegativeWeight(t *testing.T) {
+	const yamlDoc = `
+upstreams:
+  - url: http://localhost:9001
+    weight: -1
+`
+	dir := t.TempDir()
+	p := filepath.Join(dir, "lb.yaml")
+	if err := writeFile(p, yamlDoc); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load(p)
+	if err == nil {
+		t.Fatal("expected error for explicit weight=-1")
 	}
 }
 

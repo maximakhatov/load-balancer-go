@@ -14,6 +14,8 @@ import (
 
 // TODO documentation
 // TODO dry-run mode (just validate config and return error if invalid, so it can be used in CI/CD pipelines for linting)
+// TODO use proper logger across the project, instead of log.Printf
+// TODO add metrics (prometheus)
 func main() {
 	configPath := flag.String("config", "configs/lb.example.yaml", "path to YAML config file")
 	flag.Parse()
@@ -28,6 +30,11 @@ func main() {
 		log.Fatalf("failed to create balancer: %v", err)
 	}
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	go handler.Run(ctx)
+
 	srv := &http.Server{
 		Addr:         cfg.Server.Listen,
 		Handler:      handler,
@@ -35,10 +42,6 @@ func main() {
 		WriteTimeout: cfg.Server.WriteTimeout,
 		IdleTimeout:  cfg.Server.IdleTimeout,
 	}
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
 	go func() {
 		log.Printf("listening on %s", cfg.Server.Listen)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
